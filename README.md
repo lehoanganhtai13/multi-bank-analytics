@@ -535,7 +535,7 @@
         - `CORS_ALLOW_CREDENTIALS` means that whether your site will accept cookies from requests made from different origins or not.
         - `AUTH_COOKIE_DOMAIN` specifies the domain that the cookies will be sent to and all its subdomains. When the backend server sends a `Set-Cookie` header in its response, the browser will store the cookie and include it in the HTTP header for **all future requests to the domain** specified in the `AUTH_COOKIE_DOMAIN` setting.
         - Settings with `COOKIE_HTTP_ONLY` determine whether your site's component cookie should be marked as `HTTPOnly`. An `HTTPOnly` cookie cannot be accessed by client-side scripts, which provides some protection against cross-site scripting (XSS) attacks.
-        - Settings with `COOKIE_SECURE` mean that your cookies will only be sent over Https if `True` or sent over unencrypted Http if `False`. They should be set to `True` in a production environment.
+        - Settings with `COOKIE_SECURE` mean that your cookies will only be sent over Https if `True` or sent over unencrypted Http if `False`. They should be set to `True` in a production environment. When the server is hosted with Http, client side will entercount `Cross-Origin-Opener-Policy` error, which means that the URL is not secure (without Https), then the CSRF token will not be included with the cookie making the CSRF check fail.
         - Settings with `COOKIE_SAMESITE` control the `SameSite` attribute of the CSRF cookie. The `SameSite` attribute determines whether the cookie should be sent along with cross-site requests.
             - `'Lax'`: The CSRF cookie is only sent in a cross-site request if the request is **a top-level navigation** that uses a safe Http method. This is the default value in modern browsers.
             - `'Strict'`: The CSRF cookie is not sent in any cross-site requests. This provides the highest level of isolation, but can also break sites where the user expects cross-site requests to carry state (like a logged-in session).
@@ -592,7 +592,9 @@
             if raw_token is None:
                 return None
             validated_token = self.get_validated_token(raw_token)
-            check_csrf(request)
+
+            if settings.SIMPLE_JWT['AUTH_COOKIE_SECURE']:
+                check_csrf(request)
 
             return self.get_user(validated_token), validated_token  
     ```
@@ -658,7 +660,7 @@
     from core.utils import str2bool
 
     SIMPLE_JWT['SIGNING_KEY'] = os.getenv('SECRET_KEY')
-    SIMPLE_JWT['AUTH_COOKIE_SECURE'] = os.getenv('COOKIE_SECURE')
+    SIMPLE_JWT['AUTH_COOKIE_SECURE'] = str2bool(os.getenv('COOKIE_SECURE'))
     SIMPLE_JWT['AUTH_COOKIE_DOMAIN'] = os.getenv('AUTH_COOKIE_DOMAIN', default=None)
 
     SESSION_COOKIE_SECURE = str2bool(os.getenv('COOKIE_SECURE'))
