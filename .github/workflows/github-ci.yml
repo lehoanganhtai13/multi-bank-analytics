@@ -16,7 +16,7 @@ jobs:
     env:
       DATABASE_NAME: postgres
       USERNAME: postgres
-      PASSWORD: postgres
+      PASSWORD: password
       HOST: localhost
       PORT: 5432
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
