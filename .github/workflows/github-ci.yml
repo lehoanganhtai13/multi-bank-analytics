@@ -11,6 +11,23 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    environment:
+      name: development
+    env:
+      DATABASE_NAME: postgres
+      USERNAME: postgres
+      PASSWORD: postgres
+      HOST: localhost
+      PORT: 5432
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      CORS_ALLOW_ALL_ORIGINS: ${{ secrets.CORS_ALLOW_ALL_ORIGINS }}
+      ALLOWED_HOST: ${{ secrets.ALLOWED_HOST }}
+      CORS_ALLOWED_ORIGINS: ${{ secrets.CORS_ALLOWED_ORIGINS }}
+      COOKIE_SAMESITE: ${{ secrets.COOKIE_SAMESITE }}
+      COOKIE_SECURE: ${{ secrets.COOKIE_SECURE }}
+      CSRF_TRUSTED_ORIGINS: ${{ secrets.CSRF_TRUSTED_ORIGINS }}
+      DEFAULT_PERMISSION_CLASSES: ${{ secrets.DEFAULT_PERMISSION_CLASSES }}
+
     services:
       db:
         image: postgres
@@ -30,22 +47,7 @@ jobs:
         python-version: '3.9'
         
     - name: Install Dependencies
-      env:
-        DATABASE_NAME: postgres
-        USERNAME: postgres
-        PASSWORD: postgres
-        HOST: localhost
-        PORT: 5432
-        SECRET_KEY: ${{ secrets.SECRET_KEY }}
-        CORS_ALLOW_ALL_ORIGINS: ${{ secrets.CORS_ALLOW_ALL_ORIGINS }}
-        ALLOWED_HOST: ${{ secrets.ALLOWED_HOST }}
-        CORS_ALLOWED_ORIGINS: ${{ secrets.CORS_ALLOWED_ORIGINS }}
-        COOKIE_SAMESITE: ${{ secrets.COOKIE_SAMESITE }}
-        COOKIE_SECURE: ${{ secrets.COOKIE_SECURE }}
-        CSRF_TRUSTED_ORIGINS: ${{ secrets.CSRF_TRUSTED_ORIGINS }}
-        DEFAULT_PERMISSION_CLASSES: ${{ secrets.DEFAULT_PERMISSION_CLASSES }}
       run: |
-        echo "CORS_ALLOW_ALL_ORIGINS: ${CORS_ALLOW_ALL_ORIGINS}"
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
