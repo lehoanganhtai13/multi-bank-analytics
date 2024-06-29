@@ -45,6 +45,7 @@ jobs:
         CSRF_TRUSTED_ORIGINS: ${{ secrets.CSRF_TRUSTED_ORIGINS }}
         DEFAULT_PERMISSION_CLASSES: ${{ secrets.DEFAULT_PERMISSION_CLASSES }}
       run: |
+        echo "CORS_ALLOW_ALL_ORIGINS: ${CORS_ALLOW_ALL_ORIGINS}"
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
