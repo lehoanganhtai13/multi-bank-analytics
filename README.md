@@ -404,8 +404,9 @@
         - In `CustomUserSerializer`, we're using `ModelSerializer` which will automatically create fields based on the `User` model. We're including the password field in `extra_kwargs` with `'write_only': True` to ensure that the password can't be read. The `create` method is overridden to ensure that the password is hashed before it is stored in the database. The `set_password` method handles the hashing.
         - In `LoginSerializer`, we're using `EmailField` for the email to ensure that the email is valid. The `validate` method is overridden to authenticate the user with the provided email and password. If the authentication is successful and the user is active, it returns the user. Otherwise, it raises a `ValidationError`.
     - Next, create `Register`, `Login`, and `Logout` class with corresponding methods for each API.
-        - `APIView` is used when you want to handle all the logic yourself. It doesn't require you to define a serializer or a queryset, giving you full control over how the data is processed.
-        - `generics.GenericAPIView` is a subclass of APIView that provides additional behaviors for handling common use cases. It's designed to be used with Django's ORM, and it requires you to define a queryset and/or a serializer_class. It is used when you want to leverage these built-in behaviors to reduce the amount of code you have to write.
+        - `APIView` is used when you want to **handle all the logic yourself**. It doesn't require you to define a serializer or a queryset, giving you full control over how the data is processed. For more details, you can read [here](https://www.django-rest-framework.org/api-guide/views/).
+        - `generics.GenericAPIView` is a subclass of APIView that provides additional behaviors for handling common use cases. It's designed to be used with Django's ORM, and it requires you to define a queryset and/or a serializer_class. It is used when you want to leverage these built-in behaviors to reduce the amount of code you have to write. For more details, you can read [here](https://www.django-rest-framework.org/api-guide/generic-views/).
+        - `ViewSet` is a higher-level abstraction that combines the logic for multiple related views into a single class. It's designed to handle common actions like list, create, retrieve, update, and delete. When you use a `ViewSet`, you typically define a queryset and a serializer_class, and then register the ViewSet with a router. This router automatically generates the appropriate URL patterns for the actions. It is used when you want to quickly set up a full set of **CRUD** operations without having to write individual views for each action. For more details, you can read [here](https://www.django-rest-framework.org/api-guide/viewsets/).
         - `permission_classes = [IsAuthenticated]` is used to ensure that the view can only be accessed by authenticated users. For convenience, we will set it **by default** to be IsAuthenticated, any view that does not need authentication will set `permission_classes = []`, so we don't need to add `permission_classes = [IsAuthenticated]` for every API since most of the APIs will require authentication. This can be done by configuring `DEFAULT_PERMISSION_CLASSES` setting. Furthermore, to make it easier to be modified based on production (`rest_framework.permissions.IsAuthenticated` by default) or development stage (`rest_framework.permissions.AllowAny` by default for testing), we can configure to load it from environment variable.
     - Add urls for your APIs in `urls.py` of `core`. To make it convenient, we'll add these urls in `users/urls.py` then include them in `core/urls.py`.
         - For function views, it is included as `views.<VIEW_NAME>`.
@@ -462,7 +463,7 @@
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             user = serializer.save()
-            return Response({"status": "Account is registered"}, status=status.HTTP_200_OK)
+            return Response({"status": "Account is registered"}, status=status.HTTP_201_CREATED)
 
     class Login(generics.GenericAPIView):
         serializer_class = LoginSerializer
@@ -1172,15 +1173,318 @@
 
 7. **Write APIs for the above database**:
 
-    Now, after creating schema and load data to the database, we continue to write APIs for each model of the app `bank`, which will include:
+    Now, after creating schema and load data to the database, we continue to write APIs for each model of the app `bank`, which will include these endpoints:
 
-    - `api/register/bank/`: register a bank account managed by a user as a manager.
-    - `api/register/customer/`: register customer information of a bank.
-    - `api/register/account/`: register an account for a customer.
-    - `api/register/loan/`: register loan information of a specific account.
-    - `api/bank/<uuid:pk>`: get information of a specific bank.
-    - `api/account/?bank=<bank_id>`: return list of accounts of a specific bank.
-    - 
+    - `api/register/bank/`: allow a user to register a new bank where they will be assigned as the manager.
+    - `api/register/customer/`: allow a bank manager to register a new customer to their bank.
+    - `api/register/account/`: allow a bank manager to register a new account for a customer of their bank.
+    - `api/register/loan/`: allow a bank manager to register a new loan for a specific account in their bank.
+    - `api/bank/`: allow an admin to retrieve a list of all registered banks. If a non-admin user accesses this endpoint, they will only see the bank(s) they manage.
+    - `api/<model_name>/<uuid:pk>/`: allow the manager of the bank to retrieve, update, or delete a specific object it manages, except for bank model, both admin and manager of the bank can perform these operations on it. This means that the admin can only manage and monitor the banks but not their data.
+    - `api/customer/`: allow a bank manager to retrieve a list of all customers in their bank.
+    - `api/account/`: allow a bank manager to retrieve a list of all accounts in their bank.
+    - `api/loan/`: allow a bank manager to retrieve a list of all loans in their bank.
+    - `api/loan/?account=<account_id>/`: allow a bank manager to retrieve a list of all loans associated with a specific account in their bank.
+
+    `Pagination` will be used in those GET endpoints to limit the number of results returned in a single response. This is useful when dealing with large amounts of data to improve the performance of the API and the user experience. The number of results per page can be adjusted in `PAGE_SIZE`. You need to set `DEFAULT_PAGINATION_CLASS` to `rest_framework.pagination.PageNumberPagination` to enable pagination style globally.
+
+    ```python
+    # core/settings/base.py
+
+    REST_FRAMEWORK = {
+        'DEFAULT_AUTHENTICATION_CLASSES': (
+            'users.authenticate.CustomAuthentication',
+        ),
+        'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+        'PAGE_SIZE': 10,
+    }
+    ```
+
+    ```python
+    # bank/serializers.py
+
+    from rest_framework import serializers
+
+    from .models import *
+
+
+    class BankSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Bank
+            fields = '__all__'
+
+    class CustomerSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Customer
+            fields = '__all__'
+
+    class AccountSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Account
+            fields = '__all__'
+
+    class LoanSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Loan
+            fields = '__all__'
+    ```
+    
+    ```python
+    # bank/views.py
+
+    from django.contrib.auth.models import AnonymousUser
+
+    from rest_framework import status, generics, permissions
+    from rest_framework.exceptions import PermissionDenied
+    from rest_framework.response import Response
+
+    from .serializers import *
+
+    #=======================Registration APIs=======================
+
+    class RegisterBank(generics.CreateAPIView):
+        permission_classes = []
+        serializer_class = BankSerializer
+
+        def create(self, request, *args, **kwargs):
+            response = super().create(request, *args, **kwargs)
+            bank = response.data
+
+            return Response({
+                "message": f"Bank is registered",
+                "id": bank['bank_id'],
+                "bank name": bank['bank_name']
+            }, status=status.HTTP_201_CREATED)
+        
+    class RegisterCustomer(generics.CreateAPIView):
+        permission_classes = []
+        serializer_class = CustomerSerializer
+
+        def create(self, request, *args, **kwargs):
+            response = super().create(request, *args, **kwargs)
+            customer = response.data
+
+            return Response({
+                "message": f"Customer is registered",
+                "id": customer['customer_id'],
+                "customer name": f"{customer['first_name']} {customer['last_name']}"
+            }, status=status.HTTP_201_CREATED)
+        
+    class RegisterAccount(generics.CreateAPIView):
+        permission_classes = []
+        serializer_class = AccountSerializer
+
+        def create(self, request, *args, **kwargs):
+            response = super().create(request, *args, **kwargs)
+            account = response.data
+
+            return Response({
+                "message": f"Account is registered",
+                "id": account['account_id'],
+                "account number": account['account_number'],
+                "bank": account['bank_id']
+            }, status=status.HTTP_201_CREATED)
+
+    class RegisterLoan(generics.CreateAPIView):
+        permission_classes = []
+        serializer_class = LoanSerializer
+
+        def create(self, request, *args, **kwargs):
+            response = super().create(request, *args, **kwargs)
+            loan = response.data
+
+            return Response({
+                "message": f"Loan is registered",
+                "id": loan['loan_id'],
+                "loan amount": loan['loan_amount'],
+                "account": loan['account_id'],
+                "bank": loan['account']['bank_id']
+            }, status=status.HTTP_201_CREATED)
+        
+    # =======================CRUD APIs=======================
+
+    class IsAdminOrBankManager(permissions.BasePermission):
+        """
+        Custom permission to only allow admins or the manager of the bank to see it.
+        """
+        def has_object_permission(self, request, view, obj):
+            # Permissions are only allowed to the owner of the snippet
+            return request.user.is_staff or obj.manager == request.user
+
+    class LC_Bank(generics.ListCreateAPIView):
+        serializer_class = BankSerializer
+
+        def get_queryset(self):
+            user = self.request.user
+            # Check if user is anonymous
+            if isinstance(user, AnonymousUser):
+                raise PermissionDenied("User is not authenticated")
+
+            if user.is_staff:
+                return Bank.objects.all()
+            
+            return Bank.objects.filter(manager=user)
+
+    class RUD_Bank(generics.RetrieveUpdateDestroyAPIView):
+        serializer_class = BankSerializer
+        permission_classes = [IsAdminOrBankManager]
+
+        def get_queryset(self):
+            user = self.request.user
+            # Check if user is anonymous
+            if isinstance(user, AnonymousUser):
+                raise PermissionDenied("User is not authenticated")
+
+            if user.is_staff:
+                return Bank.objects.all()
+
+            return Bank.objects.filter(manager=user)
+
+
+    class LC_Customer(generics.ListCreateAPIView):
+        serializer_class = CustomerSerializer
+
+        def get_queryset(self):
+            user = self.request.user
+            # Check if user is anonymous
+            if isinstance(user, AnonymousUser):
+                raise PermissionDenied("User is not authenticated")
+            
+            return Customer.objects.filter(account__bank__manager=user)
+
+        def list(self, request, *args, **kwargs):
+            queryset = self.filter_queryset(self.get_queryset())
+
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+            
+            # Handle the case where there is no pagination
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+
+    class RUD_Customer(generics.RetrieveUpdateDestroyAPIView):
+        serializer_class = CustomerSerializer
+
+        def get_queryset(self):
+            user = self.request.user
+            # Check if user is anonymous
+            if isinstance(user, AnonymousUser):
+                raise PermissionDenied("User is not authenticated")
+            
+            return Customer.objects.filter(account__bank__manager=user)
+
+
+    class LC_Account(generics.ListCreateAPIView):
+        serializer_class = AccountSerializer
+
+        def get_queryset(self):
+            user = self.request.user
+            # Check if user is anonymous
+            if isinstance(user, AnonymousUser):
+                raise PermissionDenied("User is not authenticated")
+            
+            return Account.objects.filter(bank__manager=user)
+
+        def list(self, request, *args, **kwargs):
+            queryset = self.filter_queryset(self.get_queryset())
+
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+            
+            # Handle the case where there is no pagination
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+
+    class RUD_Account(generics.RetrieveUpdateDestroyAPIView):
+        serializer_class = AccountSerializer
+
+        def get_queryset(self):
+            user = self.request.user
+            return Account.objects.filter(bank__manager=user)
+
+
+    class LC_Loan(generics.ListCreateAPIView):
+        serializer_class = LoanSerializer
+
+        def get_queryset(self):
+            user = self.request.user
+            # Check if user is anonymous
+            if isinstance(user, AnonymousUser):
+                raise PermissionDenied("User is not authenticated")
+            
+            account = self.request.query_params.get('account', None)
+
+            if account is not None:
+                return Loan.objects.filter(account__bank__manager=user, account=account)
+
+            return Loan.objects.filter(account__bank__manager=user)
+
+        def list(self, request, *args, **kwargs):
+            queryset = self.filter_queryset(self.get_queryset())
+
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+            
+            # Handle the case where there is no pagination
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+
+    class RUD_Loan(generics.RetrieveUpdateDestroyAPIView):
+        serializer_class = LoanSerializer
+
+        def get_queryset(self):
+            user = self.request.user
+            # Check if user is anonymous
+            if isinstance(user, AnonymousUser):
+                raise PermissionDenied("User is not authenticated")
+            
+            return Loan.objects.filter(account__bank__manager=user)
+    ```
+
+    ```python
+    # banks/urls.py
+
+    from django.urls import path
+    from .views import *
+
+
+    urlpatterns = [
+        # Register APIs
+        path('regiser/bank/', RegisterBank.as_view(), name='register-bank'),
+        path('register/customer/', RegisterCustomer.as_view(), name='register-customer'),
+        path('register/account/', RegisterAccount.as_view(), name='register-account'),
+        path('register/loan/', RegisterLoan.as_view(), name='register-loan'),
+
+        # CRUD APIs
+        path('bank/', LC_Bank.as_view(), name='List-Create-bank'),
+        path('bank/<uuid:pk>/', RUD_Bank.as_view(), name='Retrieve-Update-Delete-bank'),
+
+        path('customer/', LC_Customer.as_view(), name='List-Create-customer'),
+        path('customer/<uuid:pk>/', RUD_Customer.as_view(), name='Retrieve-Update-Delete-customer'),
+
+        path('account/', LC_Account.as_view(), name='List-Create-account'),
+        path('account/<uuid:pk>/', RUD_Account.as_view(), name='Retrieve-Update-Delete-account'),
+
+        path('loan/', LC_Loan.as_view(), name='List-Create-loan'),
+        path('loan/<uuid:pk>/', RUD_Loan.as_view(), name='Retrieve-Update-Delete-loan'),
+    ]
+    ```
+
+    ```python
+    # core/urls.py
+
+    urlpatterns = [
+        path('admin/', admin.site.urls),
+        path('api/', include('users.urls')),
+        path('api/', include('bank.urls')), # Add this line
+    ]
+    ```
 
 8. **Write API to perform `Loan Status` prediction using ML model**:
 
