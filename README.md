@@ -1186,7 +1186,7 @@
     - `api/loan/`: allow a bank manager to retrieve a list of all loans in their bank.
     - `api/loan/?account=<account_id>/`: allow a bank manager to retrieve a list of all loans associated with a specific account in their bank.
 
-    `Pagination` will be used in those GET endpoints to limit the number of results returned in a single response. This is useful when dealing with large amounts of data to improve the performance of the API and the user experience. The number of results per page can be adjusted in `PAGE_SIZE`. You need to set `DEFAULT_PAGINATION_CLASS` to `rest_framework.pagination.PageNumberPagination` to enable pagination style globally.
+    `Pagination` will be used in those GET endpoints to limit the number of results returned in a single response. This is useful when dealing with large amounts of data to improve the performance of the API and the user experience. The number of results per page can be adjusted in `PAGE_SIZE`. You need to set `DEFAULT_PAGINATION_CLASS` to `rest_framework.pagination.PageNumberPagination` to enable pagination style globally. You can read for more details in [here](https://www.django-rest-framework.org/api-guide/pagination/).
 
     ```python
     # core/settings/base.py
@@ -1448,7 +1448,7 @@
     ```
 
     ```python
-    # banks/urls.py
+    # bank/urls.py
 
     from django.urls import path
     from .views import *
@@ -1486,6 +1486,22 @@
     ]
     ```
 
+    ```
+    bank
+    ├── __init__.py
+    ├── __pycache__
+    ├── admin.py
+    ├── apps.py
+    ├── load_data.py
+    ├── management
+    ├── migrations
+    ├── models.py
+    ├── serializers.py
+    ├── tests.py
+    ├── urls.py
+    └── views.py
+    ```
+
 8. **Write API to perform `Loan Status` prediction using ML model**:
 
 
@@ -1497,6 +1513,7 @@
     ├── docker
     ├── env
     ├── manage.py
+    ├── models
     ├── requirements.txt
     └── users
     ```
