@@ -36,7 +36,7 @@ class Register(generics.GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        return Response({"message": "Account is registered"}, status=status.HTTP_200_OK)
+        return Response({"message": "Account is registered"}, status=status.HTTP_201_CREATED)
 
 class Login(generics.GenericAPIView):
     permission_classes = []
