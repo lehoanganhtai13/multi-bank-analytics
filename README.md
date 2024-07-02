@@ -1186,7 +1186,7 @@
     - `api/loan/`: allow a bank manager to retrieve a list of all loans in their bank.
     - `api/loan/?account=<account_id>/`: allow a bank manager to retrieve a list of all loans associated with a specific account in their bank.
 
-    `Pagination` will be used in those GET endpoints to limit the number of results returned in a single response. This is useful when dealing with large amounts of data to improve the performance of the API and the user experience. The number of results per page can be adjusted in `PAGE_SIZE`. You need to set `DEFAULT_PAGINATION_CLASS` to `rest_framework.pagination.PageNumberPagination` to enable pagination style globally. You can read for more details in [here](https://www.django-rest-framework.org/api-guide/pagination/).
+    `Pagination` will be used in those GET endpoints to limit the number of results returned in a single response. This is useful when dealing with large amounts of data to improve the performance of the API and the user experience. The number of results per page can be adjusted in `PAGE_SIZE`. You need to set `DEFAULT_PAGINATION_CLASS` to `rest_framework.pagination.PageNumberPagination` to enable pagination style globally. You can read for more details in [here](https://www.django-rest-framework.org/api-guide/pagination/). 
 
     ```python
     # core/settings/base.py
@@ -1504,6 +1504,78 @@
 
 8. **Write API to perform `Loan Status` prediction using ML model**:
 
+    Next, we write an API to perform `Loan Status` prediction to help managers make decisions whether to approve or reject loan applications based on the predicted loan status.
+
+    - We will train an ML model to perform prediction. We will perform model selection between `LightGBM` and `CatBoost` algorithms to choose the most suitable one. You can use Jupyter notebook `train_model.ipynb` to train model with your own choice of hyperparameters.
+    - The model is loaded when the command `python manage.py runserver` is run and stays available for any prediction request.
+    - For the serializer of the view, it will require the client to include values of the fields used during the training process.
+    
+    ```python
+    # bank/serializers.py
+
+    class PredictLoanStatusSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Loan
+            fields = ['account', 'current_loan_amount', 'term', 'purpose']    
+    ```
+
+    ```python
+    # bank/views.py
+
+    with open('./models/best_model.pkl', 'rb') as f:
+        model = pickle.load(f)
+
+    class PredictLoanStatus(generics.GenericAPIView):
+        serializer_class = PredictLoanStatusSerializer
+
+        def post(self, request, *args, **kwargs):
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            account_id = serializer.validated_data['account'].account_id
+            account = Account.objects.get(account_id=account_id)
+            customer = account.customer
+
+            # Prepare the data for prediction
+            data = {
+                'Current Loan Amount': serializer.validated_data['current_loan_amount'],
+                'Term': serializer.validated_data['term'],
+                'Credit Score': customer.credit_score,
+                'Annual Income': customer.annual_income,
+                'Years in current job': customer.years_in_current_job,
+                'Home Ownership': customer.home_ownership,
+                'Purpose': serializer.validated_data['purpose'],
+                'Monthly Debt': account.monthly_debt,
+                'Years of Credit History': customer.years_of_credit_history,
+                'Months since last delinquent': account.months_since_last_delinquent,
+                'Number of Open Accounts': customer.number_of_open_accounts,
+                'Number of Credit Problems': customer.number_of_credit_problems,
+                'Current Credit Balance': account.current_credit_balance,
+                'Maximum Open Credit': account.maximum_open_credit,
+                'Bankruptcies': customer.bankruptcies,
+                'Tax Liens': customer.tax_liens
+            }
+
+            # Convert the data to data frame
+            data = pd.DataFrame([data])
+
+            # Make the prediction
+            prediction = model.predict(data)
+            if prediction[0] == 0:
+                result = 'Charged Off'
+            else:
+                result = 'Fully Paid'
+
+            return Response({'prediction': result}, status=status.HTTP_200_OK)
+    ```
+
+    ```python
+    # bank/urls.py
+
+    urlpatterns = [
+        ...
+        path('loan/predict/', PredictLoanStatus.as_view(), name='predict-loan-status'), # Add this line
+    ]
+    ```
 
     ```
     .
@@ -1514,6 +1586,9 @@
     ├── env
     ├── manage.py
     ├── models
+    │   ├── best_model.pkl
+    │   ├── catboost_info
+    │   └── train_model.ipynb
     ├── requirements.txt
     └── users
     ```
