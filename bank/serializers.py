@@ -22,3 +22,8 @@ class LoanSerializer(serializers.ModelSerializer):
     class Meta:
         model = Loan
         fields = '__all__'
+
+class PredictLoanStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Loan
+        fields = ['account', 'current_loan_amount', 'term', 'purpose']

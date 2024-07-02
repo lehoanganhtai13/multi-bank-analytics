@@ -1,3 +1,12 @@
+import numpy as np
+import pandas as pd
+import pickle
+
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, OrdinalEncoder, LabelEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
+
 from django.contrib.auth.models import AnonymousUser
 
 from rest_framework import status, generics, permissions
@@ -211,3 +220,50 @@ class RUD_Loan(generics.RetrieveUpdateDestroyAPIView):
             raise PermissionDenied("User is not authenticated")
         
         return Loan.objects.filter(account__bank__manager=user)
+
+# =======================Loan Status Prediction API=======================
+
+with open('./models/best_model.pkl', 'rb') as f:
+    model = pickle.load(f)
+
+class PredictLoanStatus(generics.GenericAPIView):
+    serializer_class = PredictLoanStatusSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        account_id = serializer.validated_data['account'].account_id
+        account = Account.objects.get(account_id=account_id)
+        customer = account.customer
+
+        # Prepare the data for prediction
+        data = {
+            'Current Loan Amount': serializer.validated_data['current_loan_amount'],
+            'Term': serializer.validated_data['term'],
+            'Credit Score': customer.credit_score,
+            'Annual Income': customer.annual_income,
+            'Years in current job': customer.years_in_current_job,
+            'Home Ownership': customer.home_ownership,
+            'Purpose': serializer.validated_data['purpose'],
+            'Monthly Debt': account.monthly_debt,
+            'Years of Credit History': customer.years_of_credit_history,
+            'Months since last delinquent': account.months_since_last_delinquent,
+            'Number of Open Accounts': customer.number_of_open_accounts,
+            'Number of Credit Problems': customer.number_of_credit_problems,
+            'Current Credit Balance': account.current_credit_balance,
+            'Maximum Open Credit': account.maximum_open_credit,
+            'Bankruptcies': customer.bankruptcies,
+            'Tax Liens': customer.tax_liens
+        }
+
+        # Convert the data to data frame
+        data = pd.DataFrame([data])
+
+        # Make the prediction
+        prediction = model.predict(data)
+        if prediction[0] == 0:
+            result = 'Charged Off'
+        else:
+            result = 'Fully Paid'
+
+        return Response({'prediction': result}, status=status.HTTP_200_OK)

@@ -21,4 +21,7 @@ urlpatterns = [
 
     path('loan/', LC_Loan.as_view(), name='List-Create-loan'),
     path('loan/<uuid:pk>/', RUD_Loan.as_view(), name='Retrieve-Update-Delete-loan'),
+
+    # Prediction API
+    path('loan/predict/', PredictLoanStatus.as_view(), name='predict-loan-status'),
 ]
